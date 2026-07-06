@@ -5,6 +5,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#FDFDFD] text-black font-sans overflow-x-hidden selection:bg-[#FFF67E]">
       
+
       {/* ÜST BAR (Navbar) */}
       <header className="h-24 border-b-4 border-black px-6 md:px-12 flex items-center justify-between bg-white sticky top-0 z-50">
         <div className="flex items-center space-x-2">
@@ -14,13 +15,23 @@ export default function LandingPage() {
           <a href="#ozellikler" className="font-bold uppercase tracking-widest hover:text-indigo-600 transition-colors">Özellikler</a>
           <a href="#nasil-calisir" className="font-bold uppercase tracking-widest hover:text-indigo-600 transition-colors">Nasıl Çalışır?</a>
         </nav>
-        <Link 
-          href="/studio"
-          className="border-4 border-black bg-[#FFF67E] px-6 py-3 rounded-xl font-black uppercase shadow-[4px_4px_0px_0_rgba(0,0,0,1)] hover:-translate-y-1 hover:shadow-[6px_6px_0px_0_rgba(0,0,0,1)] transition-all flex items-center space-x-2"
-        >
-          <span>Stüdyoya Git</span>
-          <ArrowRight size={20} />
-        </Link>
+        
+        {/* YENİ EKLENEN BUTON GRUBU */}
+        <div className="flex items-center space-x-4">
+          <Link 
+            href="/login"
+            className="hidden md:flex font-black uppercase tracking-widest hover:text-indigo-600 transition-colors"
+          >
+            Giriş Yap
+          </Link>
+          <Link 
+            href="/studio"
+            className="border-4 border-black bg-[#FFF67E] px-6 py-3 rounded-xl font-black uppercase shadow-[4px_4px_0px_0_rgba(0,0,0,1)] hover:-translate-y-1 hover:shadow-[6px_6px_0px_0_rgba(0,0,0,1)] transition-all flex items-center space-x-2"
+          >
+            <span>Stüdyoya Git</span>
+            <ArrowRight size={20} />
+          </Link>
+        </div>
       </header>
 
       {/* HERO BÖLÜMÜ (Karşılama) */}
