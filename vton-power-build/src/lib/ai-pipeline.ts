@@ -57,29 +57,29 @@ You must treat the facial identity of the subject in the provided reference imag
 
 export async function generate3DModel(imageUrl: string): Promise<string> {
   try {
-    // Kendi güvenli arka ucumuz üzerinden Hugging Face'i çağırıyoruz
-    const res = await fetch("/api/huggingface", {
+    console.log("[HERMES AI] Frontend'den Vercel 3D API'sine istek atılıyor...");
+
+    // İsteği doğrudan Vercel backend'imize yönlendiriyoruz
+    const res = await fetch("/api/generate3d", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageUrl })
+      body: JSON.stringify({ imageUrl }),
     });
 
     if (!res.ok) {
-      // Eğer backend bir hata JSON'u döndürdüyse onu yakala
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || "Hugging Face sunucusu ile iletişim kurulamadı.");
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || `3D API Hatası (HTTP ${res.status})`);
     }
 
-    // Gelen veriyi doğrudan bir Dosya (Blob) olarak tarayıcı belleğine alıyoruz
+    // Backend'den (Modal'dan) gelen GLB dosyasını (Binary) alıp tarayıcıda okutulabilir bir URL'ye çeviriyoruz
     const blob = await res.blob();
-    
-    // Bu Blob'u tarayıcının anlayacağı geçici bir URL'ye (blob:http://...) çeviriyoruz
     const objectUrl = URL.createObjectURL(blob);
     
-    // Canvas doğrudan bu URL'yi alıp 3D modeli render edecektir
+    console.log("[HERMES AI] 3D Model başarıyla frontend'e ulaştı!");
     return objectUrl;
-
-  } catch (error: any) {
-    throw new Error(error.message || "Bilinmeyen AI Pipeline Hatası");
+    
+  } catch (error) {
+    console.error("Pipeline 3D Hatası:", error);
+    throw error;
   }
 }
