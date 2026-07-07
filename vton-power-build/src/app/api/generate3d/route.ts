@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { Client } from "@gradio/client";
 
-// Vercel zaman aşımı limiti (Modal'ın 3D'yi üretmesini beklemek için)
 export const maxDuration = 60; 
 export const dynamic = 'force-dynamic';
 
@@ -14,33 +12,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Görsel linki eksik." }, { status: 400 });
     }
 
-    console.log("[HERMES AI] Modal TripoSR sunucusuna bağlanılıyor...");
+    console.log("[HERMES AI] Modal API'sine istek atılıyor...");
     
-    // DİKKAT: Terminalden aldığın kendi Modal linkini buraya yapıştır!
-    // (Aşağıdaki link örnek olarak senin daha önceki çıktına göre yazıldı, kontrol et)
-    const MODAL_URL = "https://yagizberk--hermes-triposr-gradio.modal.run"; 
+    // YENİ ALDIĞIN LİNKİ BURAYA YAPIŞTIR:
+    const MODAL_URL = "https://yagizberkonay--hermes-triposr-api-triposrapi-generate.modal.run"; 
     
-    // 1. Modal'a bağlan ve isteği at
-    const client = await Client.connect(MODAL_URL);
-    
-    console.log("[HERMES AI] Görsel işleniyor, 3D model üretimi başladı...");
-    
-    // Gradio "predict" fonksiyonunu çağırıyoruz
-    const result: any = await client.predict("/generate_3d", { 		
-        image: imageUrl, 
+    // Gradio olmadan doğrudan saf ve hızlı fetch atıyoruz
+    const res = await fetch(MODAL_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_url: imageUrl })
     });
 
-    // 2. Modal'ın ürettiği GLB dosyasının URL'sini al
-    const glbUrl = result.data[0].url; 
-    
-    // 3. Frontend dosyayı indirebilsin diye Buffer'a çeviriyoruz
-    const glbRes = await fetch(glbUrl);
-    if (!glbRes.ok) throw new Error("Modal'dan GLB dosyası indirilemedi.");
-    const glbBuffer = await glbRes.arrayBuffer();
+    if (!res.ok) {
+        throw new Error(`Modal API Hatası: Sunucu yanıt vermedi (Kod: ${res.status})`);
+    }
 
-    console.log("[HERMES AI] 3D Model başarıyla teslim edildi!");
+    const glbBuffer = await res.arrayBuffer();
+    console.log("[HERMES AI] 3D Model başarıyla teslim alındı!");
 
-    // 4. Frontend'e doğrudan 3D model dosyasını (Binary) gönderiyoruz
     return new NextResponse(glbBuffer, {
       status: 200,
       headers: {
