@@ -7,7 +7,6 @@ export default function ImageUploader() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Fotoğrafı geçici olarak ekranda göstermek için URL oluşturuyoruz
       setPreview(URL.createObjectURL(file));
     }
   };
@@ -26,7 +25,6 @@ export default function ImageUploader() {
         />
         
         {preview ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img 
             src={preview} 
             alt="Dijital İkiz Önizleme" 

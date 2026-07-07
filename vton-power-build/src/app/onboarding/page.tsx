@@ -13,24 +13,20 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export default function OnboardingPage() {
   const router = useRouter();
   
-  // Genel State'ler
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // 1. Aşama State'leri (Kayıt)
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
 
-  // 2. Aşama State'leri (Profil & Fotoğraf)
   const [photo, setPhoto] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- 1. AŞAMA: KAYIT OLMA İŞLEMİ ---
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -51,7 +47,6 @@ export default function OnboardingPage() {
     }
   };
 
-  // --- 2. AŞAMA: FOTOĞRAF SEÇİMİ VE ÖNİZLEME ---
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -60,7 +55,6 @@ export default function OnboardingPage() {
     }
   };
 
-  // --- 2. AŞAMA: PROFİLİ KAYDET VE STÜDYOYA GİT ---
   const handleProfileSetup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!photo || !height || !weight || !userId) {
@@ -72,7 +66,6 @@ export default function OnboardingPage() {
     setError(null);
 
     try {
-      // 1. Fotoğrafı Supabase Storage 'avatars' bucket'ına yükle
       const fileExt = photo.name.split('.').pop();
       const fileName = `${userId}-${Math.random()}.${fileExt}`;
       
@@ -82,12 +75,10 @@ export default function OnboardingPage() {
 
       if (uploadError) throw uploadError;
 
-      // 2. Yüklenen fotoğrafın Public URL'ini al
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(fileName);
 
-      // 3. Kullanıcı verilerini public.profiles tablosuna kaydet
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({
@@ -99,7 +90,6 @@ export default function OnboardingPage() {
 
       if (profileError) throw profileError;
 
-      // Her şey tamamsa Stüdyoya yönlendir
       router.push("/studio");
       router.refresh();
       
@@ -113,7 +103,6 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-[#FFB4B4] flex items-center justify-center p-6 selection:bg-[#FFF67E]">
       <div className={`w-full bg-white border-4 border-black rounded-3xl p-8 shadow-[12px_12px_0px_0_rgba(0,0,0,1)] relative transition-all duration-500 ${step === 2 ? 'max-w-2xl' : 'max-w-md'}`}>
         
-        {/* Dekoratif İkon */}
         <div className="absolute -top-8 -left-8 w-16 h-16 bg-[#FFF67E] border-4 border-black rounded-2xl flex items-center justify-center shadow-[4px_4px_0px_0_rgba(0,0,0,1)] transform -rotate-12">
           {step === 1 ? <Sparkles size={32} className="text-black" /> : <User size={32} className="text-black" />}
         </div>
@@ -125,7 +114,6 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* --- ADIM 1: KAYIT EKRANI --- */}
         {step === 1 && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="text-center mb-10 mt-4">
@@ -190,7 +178,6 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* --- ADIM 2: DİJİTAL İKİZ KURULUMU --- */}
         {step === 2 && (
           <div className="animate-in fade-in slide-in-from-right-8 duration-500">
             <div className="text-center mb-8 mt-4">
@@ -200,7 +187,6 @@ export default function OnboardingPage() {
 
             <form onSubmit={handleProfileSetup} className="grid grid-cols-1 md:grid-cols-2 gap-8">
               
-              {/* Sol Taraf: İpuçları ve Fiziksel Veriler */}
               <div className="space-y-6">
                 <div className="bg-[#FFF67E] border-4 border-black rounded-xl p-4 shadow-[4px_4px_0px_0_rgba(0,0,0,1)]">
                   <div className="flex items-center gap-2 mb-3 border-b-4 border-black pb-2">
@@ -241,7 +227,6 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
-              {/* Sağ Taraf: Fotoğraf Yükleme */}
               <div className="space-y-2 flex flex-col h-full">
                 <label className="font-black uppercase tracking-wider text-sm ml-2">Referans Fotoğrafın</label>
                 

@@ -14,7 +14,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, resultUrl });
 
   } catch (error: any) {
-    // BURASI KRİTİK: Hatayı Object olmaktan çıkarıp saf String'e (Metne) çeviriyoruz.
     const errorMessage = error instanceof Error ? error.message : String(error);
     
     console.error("/// API ROUTE GERÇEK HATA /// ->", errorMessage);

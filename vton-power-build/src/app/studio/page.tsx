@@ -12,7 +12,6 @@ import {
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stage, useGLTF } from "@react-three/drei";
 
-// --- 3D MODEL GÖRÜNTÜLEYİCİ BİLEŞENİ ---
 function ModelViewer({ url }: { url: string }) {
   const { scene } = useGLTF(url);
   return <primitive object={scene} />;
@@ -21,12 +20,10 @@ function ModelViewer({ url }: { url: string }) {
 export default function AppShell() {
   const router = useRouter();
   
-  // -- GENEL STATELER --
   const [userProfile, setUserProfile] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("studio");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  // -- STÜDYO STATELERİ --
   const [garmentImage, setGarmentImage] = useState<string | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [result3DModel, setResult3DModel] = useState<string | null>(null);
@@ -36,14 +33,12 @@ export default function AppShell() {
   const [loadingStep, setLoadingStep] = useState<"idle" | "2d" | "3d">("idle");
   const isProcessingRef = useRef(false);
 
-  // -- GARDIROP STATELERİ --
   const [wardrobeItems, setWardrobeItems] = useState<any[]>([]);
   const [loadingWardrobe, setLoadingWardrobe] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [discountInput, setDiscountInput] = useState("");
   const [savingDiscount, setSavingDiscount] = useState(false);
 
-  // -- AYARLAR STATELERİ --
   const [editHeight, setEditHeight] = useState("");
   const [editWeight, setEditWeight] = useState("");
   const [updateLoading, setUpdateLoading] = useState(false);
@@ -87,7 +82,6 @@ export default function AppShell() {
     }
   };
 
-  // --- ZİNCİRLEME SİHİRLİ İŞLEM (2D -> SUPABASE -> 3D) ---
   const handleMagicProcess = async () => {
     if (isProcessingRef.current) return;
     if (!userProfile?.avatar_url) return alert("Profil fotoğrafın eksik!");
@@ -114,7 +108,6 @@ export default function AppShell() {
         currentScrapedInfo = info;
       }
 
-      // 1. 2D ÜRETİM VE ANINDA KAYIT
       const generatedB64Url = await generateVTON(userProfile.avatar_url, finalGarmentImage!, extraDetails);
       setResultImage(generatedB64Url);
 
@@ -125,7 +118,6 @@ export default function AppShell() {
       
       await supabase.storage.from('wardrobe').upload(fileName, file);
       
-      // Tripo'nun indirebilmesi için Supabase'den public (açık) linki alıyoruz!
       const { data: publicUrlData } = supabase.storage.from('wardrobe').getPublicUrl(fileName);
 
       await supabase.from('wardrobe').insert({
@@ -138,7 +130,6 @@ export default function AppShell() {
 
       if (activeTab === "wardrobe") fetchWardrobe();
 
-      // 2. 3D ÜRETİM (Tripo'ya Public URL Gönderiliyor)
       try {
         setLoadingStep("3d");
         const generated3DUrl = await generate3DModel(publicUrlData.publicUrl);
@@ -264,7 +255,6 @@ export default function AppShell() {
           {userProfile.avatar_url && <img src={userProfile.avatar_url} alt="Avatar" className="w-10 h-10 rounded-lg border-2 border-black object-cover" />}
         </div>
 
-        {/* --- STÜDYO EKRANI (BENTO & 3D) --- */}
         {activeTab === "studio" && (
           <div className="w-full max-w-7xl mx-auto pl-6 md:pl-0 h-full flex flex-col">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
@@ -342,7 +332,6 @@ export default function AppShell() {
           </div>
         )}
 
-        {/* --- GARDIROP VE POP-UP --- */}
         {activeTab === "wardrobe" && (
           <div className="w-full max-w-7xl mx-auto pl-6 md:pl-0">
             {loadingWardrobe ? (
@@ -386,7 +375,6 @@ export default function AppShell() {
           </div>
         )}
 
-        {/* --- AYARLAR --- */}
         {activeTab === "settings" && (
           <div className="w-full max-w-4xl mx-auto pl-6 md:pl-0 space-y-8 pb-10">
             <div className="border-4 border-black rounded-3xl p-8 bg-white shadow-[8px_8px_0px_0_rgba(0,0,0,1)]">

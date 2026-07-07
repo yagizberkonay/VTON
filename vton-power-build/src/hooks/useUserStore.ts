@@ -26,7 +26,7 @@ export const useUserStore = create<UserState>()(
       clearProfile: () => set({ digitalTwinImage: null, weight: "", height: "", size: "" }),
     }),
     {
-      name: 'vton-user-storage', // LocalStorage'daki isim
+      name: 'vton-user-storage',
     }
   )
 );

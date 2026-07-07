@@ -13,7 +13,6 @@ export default function BrutalButton({
   ...props 
 }: BrutalButtonProps) {
   
-  // Renge göre arkaplan sınıfını belirliyoruz
   const colorClass = {
     yellow: "bg-accent-yellow",
     red: "bg-accent-red text-white",

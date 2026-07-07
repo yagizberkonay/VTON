@@ -4,7 +4,6 @@ export async function generateVTON(
   extraDetails?: string
 ): Promise<string> {
   try {
-    // Katı Yüz Koruma (Identity Preservation) Kök Promptu
     const SYSTEM_PROMPT = `# CORE DIRECTIVE: ABSOLUTE IDENTITY PRESERVATION
 You must treat the facial identity of the subject in the provided reference image as a STRICT AND HARD CONSTRAINT. The output must be the exact same individual, not a lookalike or a generic model.
 
@@ -21,7 +20,6 @@ You must treat the facial identity of the subject in the provided reference imag
 * [Variable Changes]: Apply changes ONLY to the environment, background context, attire (clothing), hair styling (if specified), and lighting conditions.
 * [The "Step-In" Principle]: Execute the rendering as if the exact, living subject from the reference image stepped directly into the new scene.`;
 
-    // Kullanıcı arayüzden ekstra detay girdiyse, bunu yapay zekanın ana komutuna ekliyoruz
     const finalPrompt = extraDetails && extraDetails.trim() !== ""
       ? `${SYSTEM_PROMPT}\n\n## 4. USER CUSTOM DETAILS (STYLE/GARMENT):\nApply these specific changes: ${extraDetails}`
       : SYSTEM_PROMPT;
@@ -55,31 +53,29 @@ You must treat the facial identity of the subject in the provided reference imag
   }
 }
 
+import { Client } from "@gradio/client";
+
 export async function generate3DModel(imageUrl: string): Promise<string> {
   try {
-    console.log("[HERMES AI] Frontend'den Vercel 3D API'sine istek atılıyor...");
+    console.log("[HERMES AI] Modal TripoSR sunucusuna bağlanılıyor...");
 
-    // İsteği doğrudan Vercel backend'imize yönlendiriyoruz
-    const res = await fetch("/api/generate3d", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageUrl }),
+    const MODAL_URL = "https://yagizberkonay--hermes-triposr-gradio-gradio-app.modal.run"; 
+
+    const client = await Client.connect(MODAL_URL);
+
+    console.log("[HERMES AI] Görsel işleniyor, 3D model üretimi başladı...");
+
+    const result: any = await client.predict("/predict", { 		
+        image: imageUrl, 
     });
 
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || `3D API Hatası (HTTP ${res.status})`);
-    }
-
-    // Backend'den (Modal'dan) gelen GLB dosyasını (Binary) alıp tarayıcıda okutulabilir bir URL'ye çeviriyoruz
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
+    const glbUrl = result.data[0].url; 
     
-    console.log("[HERMES AI] 3D Model başarıyla frontend'e ulaştı!");
-    return objectUrl;
+    console.log("[HERMES AI] 3D Model başarıyla teslim alındı!");
+    return glbUrl;
     
   } catch (error) {
-    console.error("Pipeline 3D Hatası:", error);
-    throw error;
+    console.error("TripoSR Modal Hatası:", error);
+    throw new Error("3D üretim sistemi şu anda yanıt vermiyor.");
   }
 }

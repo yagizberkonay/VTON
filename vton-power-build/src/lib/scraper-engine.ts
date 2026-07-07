@@ -4,13 +4,10 @@ export async function scrapeProductImage(url: string): Promise<string | null> {
   try {
     let finalUrl = url;
 
-    // ---------------------------------------------------------
-    // 1. ADIM: KISA LİNK ÇÖZÜCÜ (ty.gl, amzn.to)
-    // ---------------------------------------------------------
     if (url.includes("ty.gl") || url.includes("amzn.to")) {
       try {
         const unshortenRes = await fetch(`https://unshorten.me/json/${encodeURIComponent(url)}`, {
-          signal: AbortSignal.timeout(3000) // 3 saniyede cevap vermezse atla
+          signal: AbortSignal.timeout(3000) 
         });
         const unshortenData = await unshortenRes.json();
         if (unshortenData.resolved_url) finalUrl = unshortenData.resolved_url;
@@ -19,9 +16,6 @@ export async function scrapeProductImage(url: string): Promise<string | null> {
       }
     }
 
-    // ---------------------------------------------------------
-    // 2. ADIM: TRENDYOL GİZLİ API DENEMESİ (Zırhlı)
-    // ---------------------------------------------------------
     if (finalUrl.includes("trendyol")) {
       try {
         const productIdMatch = finalUrl.match(/-p-(\d+)/);
@@ -34,7 +28,7 @@ export async function scrapeProductImage(url: string): Promise<string | null> {
               "User-Agent": "Trendyol/7.9.2.483 (iPhone; iOS 15.0; Scale/3.00)",
               "Accept": "application/json"
             },
-            signal: AbortSignal.timeout(3000) // DNS bulamazsa 3 sn'de iptal et
+            signal: AbortSignal.timeout(3000) 
           });
 
           if (apiRes.ok) {
@@ -42,19 +36,15 @@ export async function scrapeProductImage(url: string): Promise<string | null> {
             if (data?.result?.images && data.result.images.length > 0) {
               let imgPath = data.result.images[0];
               if (!imgPath.startsWith('http')) imgPath = `https://cdn.dsmcdn.com/${imgPath}`;
-              return imgPath; // Başarılı!
+              return imgPath; 
             }
           }
         }
       } catch (e) {
         console.log("Trendyol API DNS engeli yedi, yedek API'lere geçiliyor...");
-        // Hata fırlatmıyoruz, sistemin devam etmesini sağlıyoruz!
       }
     }
 
-    // ---------------------------------------------------------
-    // 3. ADIM: METADATA API ORDUSU (Microlink, Dub, JsonLink)
-    // ---------------------------------------------------------
     const apis = [
       `https://api.dub.co/metatags?url=${encodeURIComponent(finalUrl)}`,
       `https://jsonlink.io/api/extract?url=${encodeURIComponent(finalUrl)}`,
@@ -70,16 +60,13 @@ export async function scrapeProductImage(url: string): Promise<string | null> {
         let img = data?.image || data?.images?.[0] || data?.data?.image?.url;
         
         if (img && typeof img === 'string' && img.startsWith("http")) {
-          return img; // Bulduğu an döndürür
+          return img; 
         }
       } catch (e) {
-        continue; // Çökerse diğerine geç
+        continue; 
       }
     }
 
-    // ---------------------------------------------------------
-    // 4. ADIM: SON ÇARE (Kendi Cheerio Tarayıcımız + Regex)
-    // ---------------------------------------------------------
     try {
       const fallbackRes = await fetch(finalUrl, {
         headers: { "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" },
@@ -90,7 +77,6 @@ export async function scrapeProductImage(url: string): Promise<string | null> {
         const html = await fallbackRes.text();
         const $ = cheerio.load(html);
 
-        // Eğer Trendyol ise ve HTML geldiyse Regex ile kopar
         if (finalUrl.includes("trendyol")) {
           const match = html.match(/"https:\/\/cdn\.dsmcdn\.com\/ty[^"]+"/);
           if (match) {
@@ -106,7 +92,7 @@ export async function scrapeProductImage(url: string): Promise<string | null> {
       console.log("HTML kazıma başarısız.");
     }
 
-    return null; // Hiçbiri bulamazsa pes et
+    return null; 
 
   } catch (error) {
     console.error("Beklenmeyen Motor Hatası:", error);

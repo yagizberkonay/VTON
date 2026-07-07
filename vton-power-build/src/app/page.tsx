@@ -6,7 +6,6 @@ export default function LandingPage() {
     <div className="min-h-screen bg-[#FDFDFD] text-black font-sans overflow-x-hidden selection:bg-[#FFF67E]">
       
 
-      {/* ÜST BAR (Navbar) */}
       <header className="h-24 border-b-4 border-black px-6 md:px-12 flex items-center justify-between bg-white sticky top-0 z-50">
         <div className="flex items-center space-x-2">
           <h1 className="text-4xl font-black tracking-tighter uppercase">Hermes.</h1>
@@ -16,7 +15,6 @@ export default function LandingPage() {
           <a href="#nasil-calisir" className="font-bold uppercase tracking-widest hover:text-indigo-600 transition-colors">Nasıl Çalışır?</a>
         </nav>
         
-        {/* YENİ EKLENEN BUTON GRUBU */}
         <div className="flex items-center space-x-4">
           <Link 
             href="/login"
@@ -34,7 +32,6 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* HERO BÖLÜMÜ (Karşılama) */}
       <section className="px-6 md:px-12 py-20 md:py-32 flex flex-col items-center text-center bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
         <div className="inline-flex items-center space-x-2 border-4 border-black bg-[#B4E4FF] px-6 py-2 rounded-full font-black uppercase mb-8 shadow-[4px_4px_0px_0_rgba(0,0,0,1)] transform -rotate-2">
           <Sparkles size={20} className="text-indigo-600" />
@@ -60,7 +57,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* KAYAN YAZI ŞERİDİ (Marquee) */}
       <div className="border-y-4 border-black bg-[#FFB4B4] overflow-hidden py-4 flex whitespace-nowrap">
         <div className="animate-[marquee_20s_linear_infinite] flex space-x-12 font-black uppercase text-2xl tracking-widest">
           <span>🔥 Kusursuz Yüz Koruması</span>
@@ -81,7 +77,6 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* ÖZELLİKLER (Bento Grid) */}
       <section id="ozellikler" className="px-6 md:px-12 py-24 bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-end mb-16">
@@ -91,7 +86,6 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Kutu 1 */}
             <div className="border-4 border-black bg-[#FFF67E] rounded-3xl p-8 shadow-[8px_8px_0px_0_rgba(0,0,0,1)] hover:-translate-y-2 transition-transform">
               <div className="w-16 h-16 bg-white border-4 border-black rounded-2xl flex items-center justify-center mb-6 shadow-[4px_4px_0px_0_rgba(0,0,0,1)]">
                 <ShieldCheck size={32} />
@@ -102,7 +96,6 @@ export default function LandingPage() {
               </p>
             </div>
 
-            {/* Kutu 2 */}
             <div className="border-4 border-black bg-white rounded-3xl p-8 shadow-[8px_8px_0px_0_rgba(0,0,0,1)] hover:-translate-y-2 transition-transform md:-translate-y-8">
               <div className="w-16 h-16 bg-[#B4E4FF] border-4 border-black rounded-2xl flex items-center justify-center mb-6 shadow-[4px_4px_0px_0_rgba(0,0,0,1)]">
                 <Zap size={32} />
@@ -113,7 +106,6 @@ export default function LandingPage() {
               </p>
             </div>
 
-            {/* Kutu 3 */}
             <div className="border-4 border-black bg-[#FFB4B4] rounded-3xl p-8 shadow-[8px_8px_0px_0_rgba(0,0,0,1)] hover:-translate-y-2 transition-transform">
               <div className="w-16 h-16 bg-white border-4 border-black rounded-2xl flex items-center justify-center mb-6 shadow-[4px_4px_0px_0_rgba(0,0,0,1)]">
                 <Shirt size={32} />
@@ -127,7 +119,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* FOOTER */}
       <footer className="border-t-4 border-black bg-white py-12 px-6 md:px-12 flex flex-col md:flex-row justify-between items-center text-center md:text-left space-y-6 md:space-y-0">
         <h2 className="text-3xl font-black tracking-tighter uppercase">Hermes.</h2>
         <p className="font-bold uppercase tracking-widest text-black/50">© 2026 Tüm Hakları Saklıdır.</p>
@@ -136,7 +127,6 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      {/* Kayan Yazı Animasyonu İçin Tailwind Config Eki (Eğer Yoksa Sessizce Çalışır) */}
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes marquee {
           0% { transform: translateX(0%); }

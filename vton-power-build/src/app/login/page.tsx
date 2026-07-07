@@ -6,7 +6,6 @@ import Link from "next/link";
 import { ArrowRight, Mail, Lock, AlertCircle, Loader2, Zap } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 
-// Supabase istemcisini oluşturuyoruz
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -32,7 +31,6 @@ export default function LoginPage() {
       setError("Giriş başarısız. E-posta veya şifreni kontrol et.");
       setLoading(false);
     } else {
-      // Başarılı giriş sonrası doğrudan stüdyoya gönderiyoruz
       router.push("/studio");
       router.refresh();
     }

@@ -14,10 +14,8 @@ export async function POST(req: Request) {
 
     console.log("[HERMES AI] Modal API'sine istek atılıyor...");
     
-    // YENİ ALDIĞIN LİNKİ BURAYA YAPIŞTIR:
     const MODAL_URL = "https://yagizberkonay--hermes-triposr-api-triposrapi-generate.modal.run"; 
     
-    // Gradio olmadan doğrudan saf ve hızlı fetch atıyoruz
     const res = await fetch(MODAL_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

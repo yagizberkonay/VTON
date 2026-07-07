@@ -2,7 +2,6 @@ import modal
 
 app = modal.App("hermes-triposr-api")
 
-# --- ZIRH 1: TÜM MODELLERİ BUILD AŞAMASINDA GÖMME ---
 def download_models_at_build_time():
     import os
     import urllib.request
@@ -18,7 +17,6 @@ def download_models_at_build_time():
         "/root/.u2net/u2net.onnx"
     )
 
-# --- ZIRH 2: EKSİKSİZ VE GELECEK KORUMALI SİSTEM BAĞIMLILIKLARI ---
 triposr_image = (
     modal.Image.from_registry("nvidia/cuda:12.1.1-devel-ubuntu22.04", add_python="3.10")
     .apt_install(
@@ -135,7 +133,6 @@ class TripoSRAPI:
             
             with torch.no_grad():
                 scene_codes = self.model(image, device="cuda:0")
-                # --- ÇÖZÜM BURADA: Renkli model istediğimizi (has_vertex_color=True) açıkça belirttik ---
                 mesh = self.model.extract_mesh(scene_codes, has_vertex_color=True)[0]
             
             print("[HERMES AI] GLB dosyasına dönüştürülüyor...")

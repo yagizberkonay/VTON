@@ -51,7 +51,6 @@ def generate_vton(req: VTONRequest):
         client = Client("yisol/IDM-VTON")
         print("HuggingFace Kuyruğuna Girildi. Yüz Koruması Aktif...")
 
-        # GÜNCELLENEN KISIM: Sadece zorunlu parametreleri gönderiyoruz
         result = client.predict(
             dict={"background": handle_file(person_path), "layers": [], "composite": None},
             garm_img=handle_file(garment_path),
