@@ -3,18 +3,42 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { generateVTON, generate3DModel } from "@/lib/ai-pipeline";
+import { generateVTON, generate3DModel, getStylistFeedback } from "@/lib/ai-pipeline";
 import { 
   Shirt, Settings, LogOut, Wand2, UploadCloud, Menu, X, Trash2, 
   Save, Sparkles, MessageSquare, ExternalLink, Tag, Search, 
-  ShoppingBag, Info, Box 
+  ShoppingBag, Info, Box, UserCheck, AlertTriangle, CheckCircle2
 } from "lucide-react";
-import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Stage, useGLTF } from "@react-three/drei";
+import { Canvas, useLoader } from "@react-three/fiber";
+import { OrbitControls, Stage } from "@react-three/drei";
+import { OBJLoader } from "three-stdlib";
 
+// =====================================================================
+// OBJ GÖRÜNTÜLEYİCİ BİLEŞENİ
+// =====================================================================
 function ModelViewer({ url }: { url: string }) {
-  const { scene } = useGLTF(url);
-  return <primitive object={scene} />;
+  const obj = useLoader(OBJLoader, url);
+  return <primitive object={obj} />;
+}
+
+export interface StylistFeedback {
+  fit_percentage: string;
+  analysis: string;
+  recommendation: string;
+}
+
+// =====================================================================
+// UYARI / ONAY PENCERESİ TİPİ
+// =====================================================================
+interface DialogConfig {
+  isOpen: boolean;
+  type: "alert" | "confirm";
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+  bgColor?: string;
+  onConfirm?: () => void;
 }
 
 export default function AppShell() {
@@ -30,8 +54,14 @@ export default function AppShell() {
   const [inputUrl, setInputUrl] = useState("");
   const [extraDetails, setExtraDetails] = useState("");
   const [scrapedInfo, setScrapedInfo] = useState<any>(null);
+  
+  // Yükleme Durumları
   const [loadingStep, setLoadingStep] = useState<"idle" | "2d" | "3d">("idle");
+  const [isFeedbackLoading, setIsFeedbackLoading] = useState(false);
   const isProcessingRef = useRef(false);
+
+  const [feedback, setFeedback] = useState<StylistFeedback | null>(null);
+  const [viewMode, setViewMode] = useState<"2D" | "3D">("2D");
 
   const [wardrobeItems, setWardrobeItems] = useState<any[]>([]);
   const [loadingWardrobe, setLoadingWardrobe] = useState(false);
@@ -46,6 +76,46 @@ export default function AppShell() {
   const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
   const [avatarLoading, setAvatarLoading] = useState(false);
 
+  // =====================================================================
+  // BRUTALIST POPUP (DIALOG) STATE'İ
+  // =====================================================================
+  const [dialogConfig, setDialogConfig] = useState<DialogConfig>({
+    isOpen: false,
+    type: "alert",
+    title: "",
+    message: ""
+  });
+
+  const showAlert = (title: string, message: string, bgColor: string = "bg-[#FFF67E]") => {
+    setDialogConfig({
+      isOpen: true,
+      type: "alert",
+      title,
+      message,
+      confirmText: "Anladım",
+      bgColor,
+      onConfirm: () => setDialogConfig(prev => ({ ...prev, isOpen: false }))
+    });
+  };
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void, bgColor: string = "bg-[#FFB4B4]") => {
+    setDialogConfig({
+      isOpen: true,
+      type: "confirm",
+      title,
+      message,
+      confirmText: "Evet, Onaylıyorum",
+      cancelText: "Vazgeç",
+      bgColor,
+      onConfirm: () => {
+        setDialogConfig(prev => ({ ...prev, isOpen: false }));
+        onConfirm();
+      }
+    });
+  };
+
+  // =====================================================================
+  
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -84,13 +154,15 @@ export default function AppShell() {
 
   const handleMagicProcess = async () => {
     if (isProcessingRef.current) return;
-    if (!userProfile?.avatar_url) return alert("Profil fotoğrafın eksik!");
-    if (!inputUrl && !garmentImage) return alert("Lütfen bir ürün linki yapıştır veya fotoğraf yükle!");
+    if (!userProfile?.avatar_url) return showAlert("Dijital İkiz Eksik", "Profil fotoğrafın eksik! Önce ayarlardan dijital ikizini yüklemelisin.", "bg-[#FFB4B4]");
+    if (!inputUrl && !garmentImage) return showAlert("Kıyafet Seçilmedi", "Lütfen bir ürün linki yapıştır veya fotoğraf yükle!", "bg-[#FFB4B4]");
     
     isProcessingRef.current = true;
     setLoadingStep("2d");
     setResultImage(null);
     setResult3DModel(null);
+    setFeedback(null);
+    setViewMode("2D");
 
     try {
       let finalGarmentImage = garmentImage;
@@ -117,7 +189,6 @@ export default function AppShell() {
       const fileName = `${userProfile.id}-${Date.now()}.png`;
       
       await supabase.storage.from('wardrobe').upload(fileName, file);
-      
       const { data: publicUrlData } = supabase.storage.from('wardrobe').getPublicUrl(fileName);
 
       await supabase.from('wardrobe').insert({
@@ -130,25 +201,44 @@ export default function AppShell() {
 
       if (activeTab === "wardrobe") fetchWardrobe();
 
+      setIsFeedbackLoading(true);
       try {
-        setLoadingStep("3d");
-        const generated3DUrl = await generate3DModel(publicUrlData.publicUrl);
-        setResult3DModel(generated3DUrl);
-      } catch (threeDError: any) {
-        console.warn("3D Üretim Hatası:", threeDError);
-        alert(`2D Kombinin gardıroba eklendi! ✨\n\nAncak 3D üretimde bir sorun çıktı: ${threeDError.message}`);
+        const stylistData = await getStylistFeedback(publicUrlData.publicUrl);
+        setFeedback(stylistData);
+      } catch (geminiError) {
+        console.warn("Gemini Stilist Hatası:", geminiError);
+      } finally {
+        setIsFeedbackLoading(false);
       }
 
     } catch (error: any) {
-      alert(`İşlem Hatası: ${error.message}`);
+      showAlert("İşlem Başarısız", `Sanal deneme sırasında bir hata oluştu: ${error.message}`, "bg-[#FFB4B4]");
     } finally {
       setLoadingStep("idle");
       isProcessingRef.current = false;
     }
   };
 
-  const handleDeleteItem = async (itemId: string, imageUrl: string) => {
-    if (!confirm("Bu kombini arşivden silmek istediğine emin misin?")) return;
+  const handleGenerate3D = async () => {
+    if (!resultImage) return;
+    setLoadingStep("3d");
+    
+    try {
+      const generated3DUrl = await generate3DModel(resultImage);
+      setResult3DModel(generated3DUrl);
+      setViewMode("3D");
+    } catch (error: any) {
+      showAlert("3D Üretim Hatası", `Anatomi işlenirken bir sorun oluştu: ${error.message}`, "bg-[#FFB4B4]");
+    } finally {
+      setLoadingStep("idle");
+    }
+  };
+
+  const requestDelete = (itemId: string, imageUrl: string) => {
+    showConfirm("Arşivden Sil", "Bu kombini gardırobundan tamamen silmek istediğine emin misin? Bu işlem geri alınamaz.", () => executeDelete(itemId, imageUrl), "bg-[#FFB4B4]");
+  };
+
+  const executeDelete = async (itemId: string, imageUrl: string) => {
     try {
       const { error: dbError } = await supabase.from("wardrobe").delete().eq("id", itemId);
       if (dbError) throw dbError;
@@ -156,7 +246,10 @@ export default function AppShell() {
       if (fileName) await supabase.storage.from("wardrobe").remove([fileName]);
       setWardrobeItems(wardrobeItems.filter(item => item.id !== itemId));
       setSelectedItem(null);
-    } catch (error: any) { alert(error.message); }
+      showAlert("Silindi", "Kombin gardırobundan başarıyla silindi.", "bg-green-400");
+    } catch (error: any) { 
+      showAlert("Hata", `Silme işlemi başarısız: ${error.message}`, "bg-[#FFB4B4]"); 
+    }
   };
 
   const handleSaveDiscountCode = async () => {
@@ -166,18 +259,26 @@ export default function AppShell() {
       await supabase.from('wardrobe').update({ discount_code: discountInput }).eq('id', selectedItem.id);
       setSelectedItem({ ...selectedItem, discount_code: discountInput });
       setWardrobeItems(wardrobeItems.map(item => item.id === selectedItem.id ? { ...item, discount_code: discountInput } : item));
-      alert("İndirim kodu eklendi!");
-    } catch (error) { alert("Hata oluştu."); } finally { setSavingDiscount(false); }
+      showAlert("Başarılı", "İndirim kodu kombin detaylarına kaydedildi!", "bg-green-400");
+    } catch (error) { 
+      showAlert("Hata", "Kod kaydedilirken bir hata oluştu.", "bg-[#FFB4B4]"); 
+    } finally { 
+      setSavingDiscount(false); 
+    }
   };
 
   const handleUpdateProfile = async () => {
-    if (!editHeight || !editWeight) return alert("Boş bırakılamaz!");
+    if (!editHeight || !editWeight) return showAlert("Uyarı", "Boy ve Kilo alanları boş bırakılamaz!", "bg-[#FFF67E]");
     setUpdateLoading(true);
     try {
       await supabase.from("profiles").update({ height: editHeight, weight: editWeight }).eq("id", userProfile.id);
       setUserProfile((prev: any) => ({ ...prev, height: editHeight, weight: editWeight }));
-      alert("Güncellendi!");
-    } catch (error: any) { alert("Hata: " + error.message); } finally { setUpdateLoading(false); }
+      showAlert("Başarılı", "Fiziksel ölçülerin başarıyla güncellendi!", "bg-green-400");
+    } catch (error: any) { 
+      showAlert("Hata", `Güncelleme başarısız: ${error.message}`, "bg-[#FFB4B4]"); 
+    } finally { 
+      setUpdateLoading(false); 
+    }
   };
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -201,8 +302,12 @@ export default function AppShell() {
       await supabase.from("profiles").update({ avatar_url: publicUrlData.publicUrl }).eq("id", userProfile.id);
       setUserProfile((prev: any) => ({ ...prev, avatar_url: publicUrlData.publicUrl }));
       setEditImageFile(null); setEditImagePreview(null);
-      alert("Fotoğraf güncellendi!");
-    } catch (error: any) { alert("Hata: " + error.message); } finally { setAvatarLoading(false); }
+      showAlert("İkiz Güncellendi", "Yeni dijital ikizin başarıyla kaydedildi!", "bg-green-400");
+    } catch (error: any) { 
+      showAlert("Hata", `Fotoğraf güncellenirken hata oluştu: ${error.message}`, "bg-[#FFB4B4]"); 
+    } finally { 
+      setAvatarLoading(false); 
+    }
   };
 
   const handleLogout = async () => { await supabase.auth.signOut(); router.push("/onboarding"); };
@@ -210,8 +315,39 @@ export default function AppShell() {
   if (!userProfile) return <div className="min-h-screen flex items-center justify-center font-black text-2xl bg-[#FDFDFD]">Yükleniyor...</div>;
 
   return (
-    <div className="min-h-screen bg-[#FDFDFD] text-black font-sans flex overflow-hidden selection:bg-[#FFF67E]">
+    <div className="min-h-screen bg-[#FDFDFD] text-black font-sans flex overflow-hidden selection:bg-[#FFF67E] relative">
       
+      {/* BRUTALIST DIALOG / POPUP MİMARİSİ */}
+      {dialogConfig.isOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-white border-[6px] border-black rounded-3xl w-full max-w-md overflow-hidden shadow-[16px_16px_0px_0_rgba(0,0,0,1)] animate-in zoom-in-95 duration-200 flex flex-col">
+            <div className={`${dialogConfig.bgColor} p-6 border-b-[6px] border-black flex items-center justify-between`}>
+              <h3 className="text-2xl font-black uppercase tracking-tight text-black">{dialogConfig.title}</h3>
+              {dialogConfig.bgColor === "bg-[#FFB4B4]" ? <AlertTriangle size={32} className="text-black" /> : <CheckCircle2 size={32} className="text-black" />}
+            </div>
+            <div className="p-8">
+              <p className="text-lg font-bold text-black/80 whitespace-pre-wrap">{dialogConfig.message}</p>
+            </div>
+            <div className="p-6 border-t-[6px] border-black bg-gray-50 flex justify-end gap-4">
+              {dialogConfig.type === "confirm" && (
+                <button 
+                  onClick={() => setDialogConfig(prev => ({ ...prev, isOpen: false }))}
+                  className="px-6 py-3 border-4 border-black rounded-xl font-black uppercase bg-white hover:bg-gray-200 transition-colors shadow-[4px_4px_0px_0_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none"
+                >
+                  {dialogConfig.cancelText}
+                </button>
+              )}
+              <button 
+                onClick={dialogConfig.onConfirm}
+                className="px-6 py-3 border-4 border-black rounded-xl font-black uppercase bg-black text-white hover:bg-gray-800 transition-colors shadow-[4px_4px_0px_0_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none"
+              >
+                {dialogConfig.confirmText}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isMobileMenuOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />}
 
       <aside className={`${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 fixed md:relative top-0 left-0 h-full w-80 bg-[#FDFDFD] flex flex-col transition-transform duration-300 z-50 p-6`}>
@@ -241,7 +377,7 @@ export default function AppShell() {
       </aside>
 
       <main className="flex-1 flex flex-col h-screen overflow-y-auto w-full relative py-6 pr-6">
-        <header className="hidden md:flex h-24 border-4 border-black rounded-3xl px-8 items-center justify-between bg-white z-10 mb-6 shadow-[8px_8px_0px_0_rgba(0,0,0,1)]">
+        <header className="hidden md:flex h-24 border-4 border-black rounded-3xl px-8 items-center justify-between bg-white z-10 mb-6 shadow-[8px_8px_0px_0_rgba(0,0,0,1)] shrink-0">
           <h2 className="text-3xl font-black uppercase tracking-tight">{activeTab === "studio" ? "Yaratım Merkezi" : activeTab === "wardrobe" ? "Gardırop Arşivi" : "Profil Ayarları"}</h2>
           <div className="flex items-center space-x-4">
             <div className="text-right"><p className="text-sm font-black uppercase">Dijital İkiz</p><p className="text-xs font-bold text-black/60">{userProfile.height || "-"}cm • {userProfile.weight || "-"}kg</p></div>
@@ -249,14 +385,14 @@ export default function AppShell() {
           </div>
         </header>
 
-        <div className="md:hidden flex items-center justify-between border-4 border-black rounded-2xl bg-white p-4 mb-4 shadow-[4px_4px_0px_0_rgba(0,0,0,1)] ml-6">
+        <div className="md:hidden flex items-center justify-between border-4 border-black rounded-2xl bg-white p-4 mb-4 shadow-[4px_4px_0px_0_rgba(0,0,0,1)] ml-6 shrink-0">
           <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 border-2 border-black rounded-lg shadow-[2px_2px_0px_0_rgba(0,0,0,1)] bg-[#FFF67E]"><Menu size={24} /></button>
           <h1 className="text-2xl font-black uppercase">Hermes.</h1>
           {userProfile.avatar_url && <img src={userProfile.avatar_url} alt="Avatar" className="w-10 h-10 rounded-lg border-2 border-black object-cover" />}
         </div>
 
         {activeTab === "studio" && (
-          <div className="w-full max-w-7xl mx-auto pl-6 md:pl-0 h-full flex flex-col">
+          <div className="w-full max-w-7xl mx-auto pl-6 md:pl-0 h-full flex flex-col pb-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
               
               <div className="lg:col-span-5 flex flex-col gap-6">
@@ -280,53 +416,118 @@ export default function AppShell() {
                   <label className="flex items-center gap-2 text-sm font-black uppercase mb-3"><MessageSquare size={18} /> Detay Ekle <span className="text-black/50 text-xs">(İsteğe Bağlı)</span></label>
                   <textarea placeholder="Örn: Kıyafetin rengi kırmızı olsun..." value={extraDetails} onChange={(e) => setExtraDetails(e.target.value)} className="w-full bg-gray-50 border-4 border-black rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:bg-[#B4E4FF] transition-colors resize-none h-24 placeholder:text-black/40" />
                 </div>
-                <button onClick={handleMagicProcess} disabled={loadingStep !== "idle" || (!inputUrl && !garmentImage)} className="w-full py-6 border-4 border-black rounded-3xl shadow-[8px_8px_0px_0_rgba(0,0,0,1)] bg-indigo-600 text-white text-2xl font-black uppercase tracking-widest hover:bg-indigo-700 hover:-translate-y-1 hover:shadow-[12px_12px_0px_0_rgba(0,0,0,1)] active:translate-y-2 active:shadow-none transition-all disabled:opacity-50 flex items-center justify-center space-x-4">
-                  {loadingStep !== "idle" ? <><Wand2 size={32} className="animate-spin" /><span>Sihir Gerçekleşiyor...</span></> : <><Box size={32} /><span>3D Metaverse Göster</span></>}
+                
+                <button 
+                  onClick={handleMagicProcess} 
+                  disabled={loadingStep !== "idle" || (!inputUrl && !garmentImage)} 
+                  className="w-full py-6 border-4 border-black rounded-3xl shadow-[8px_8px_0px_0_rgba(0,0,0,1)] bg-indigo-600 text-white text-2xl font-black uppercase tracking-widest hover:bg-indigo-700 hover:-translate-y-1 hover:shadow-[12px_12px_0px_0_rgba(0,0,0,1)] active:translate-y-2 active:shadow-none transition-all disabled:opacity-50 flex items-center justify-center space-x-4"
+                >
+                  {loadingStep === "2d" ? <><Wand2 size={32} className="animate-spin" /><span>Sihir Gerçekleşiyor...</span></> : <><Sparkles size={32} /><span>Sanal Denemeyi Başlat</span></>}
                 </button>
               </div>
 
-              <div className="lg:col-span-7 border-4 border-black rounded-3xl p-6 bg-[#B4E4FF] shadow-[8px_8px_0px_0_rgba(0,0,0,1)] flex flex-col relative overflow-hidden">
-                <div className="flex justify-between items-center mb-6">
+              <div className="lg:col-span-7 border-4 border-black rounded-3xl p-6 bg-[#B4E4FF] shadow-[8px_8px_0px_0_rgba(0,0,0,1)] flex flex-col relative overflow-y-auto">
+                <div className="flex justify-between items-center mb-6 shrink-0">
                   <h3 className="text-2xl font-black uppercase tracking-tight">2. Canlı Sonuç</h3>
-                  {result3DModel ? (
-                    <span className="border-4 border-black bg-green-400 text-black px-4 py-2 rounded-full font-black uppercase text-sm shadow-[4px_4px_0px_0_rgba(0,0,0,1)] flex items-center gap-2"><Box size={16}/> 3D Model Hazır</span>
-                  ) : resultImage ? (
+                  
+                  {result3DModel && (
+                    <div className="flex gap-2 bg-white border-4 border-black rounded-xl p-1 shadow-[4px_4px_0px_0_rgba(0,0,0,1)]">
+                      <button onClick={() => setViewMode("2D")} className={`px-4 py-1.5 rounded-lg text-sm font-black uppercase transition-colors ${viewMode === "2D" ? "bg-black text-white" : "text-black/50 hover:bg-gray-100"}`}>2D Görsel</button>
+                      <button onClick={() => setViewMode("3D")} className={`px-4 py-1.5 rounded-lg text-sm font-black uppercase transition-colors ${viewMode === "3D" ? "bg-black text-white" : "text-black/50 hover:bg-gray-100"}`}>3D İskelet</button>
+                    </div>
+                  )}
+                  {!result3DModel && resultImage && (
                     <span className="border-4 border-black bg-[#FFF67E] px-4 py-2 rounded-full font-black uppercase text-sm shadow-[4px_4px_0px_0_rgba(0,0,0,1)]">✨ 2D Arşive Kaydedildi</span>
-                  ) : null}
+                  )}
                 </div>
                 
-                <div className="flex-1 border-4 border-black rounded-2xl bg-white overflow-hidden flex items-center justify-center relative shadow-inner">
-                  {result3DModel ? (
-                    <div className="w-full h-full cursor-grab active:cursor-grabbing">
+                <div className="w-full min-h-[400px] border-4 border-black rounded-2xl bg-white overflow-hidden flex items-center justify-center relative shadow-inner shrink-0 mb-6">
+                  {viewMode === "3D" && result3DModel ? (
+                    <div className="w-full h-full min-h-[400px] cursor-grab active:cursor-grabbing relative">
                       <Canvas shadows camera={{ position: [0, 0, 4], fov: 50 }}>
                         <ambientLight intensity={1} />
                         <directionalLight position={[10, 10, 10]} intensity={1.5} castShadow />
                         <Stage environment="city" intensity={0.6}><ModelViewer url={result3DModel} /></Stage>
                         <OrbitControls autoRotate autoRotateSpeed={2} enablePan={false} maxPolarAngle={Math.PI / 2} minPolarAngle={Math.PI / 4} />
                       </Canvas>
-                      <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none"><p className="bg-black/80 text-white inline-block px-4 py-2 rounded-full font-bold text-sm uppercase tracking-widest shadow-lg">Farenle modeli çevir</p></div>
+                      <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
+                        <p className="bg-black text-white inline-block px-4 py-2 rounded-xl border-2 border-white font-bold text-sm uppercase tracking-widest shadow-lg">Fare/Dokunmatik ile Çevir</p>
+                      </div>
                     </div>
                   ) : resultImage ? (
-                    <div className="w-full h-full relative group">
-                      <img src={resultImage} alt="2D Sonuç" className="w-full h-full object-contain bg-gray-50 p-2" />
+                    <div className="w-full h-full relative group min-h-[400px]">
+                      <img src={resultImage} alt="2D Sonuç" className="w-full h-full object-contain bg-gray-50 p-2 absolute inset-0" />
                       {loadingStep === "3d" && (
                          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center border-4 border-indigo-600 m-4 rounded-xl animate-pulse">
                             <Box size={64} className="text-indigo-600 mb-4 animate-bounce" />
-                            <h3 className="text-2xl font-black uppercase mb-2">Tripo 3D Model Üretiyor</h3>
-                            <p className="font-bold text-black/60">Lütfen bekleyin, bu işlem ortalama 15 saniye sürer...</p>
+                            <h3 className="text-2xl font-black uppercase mb-2">3D Anatomi Örülüyor</h3>
+                            <p className="font-bold text-black/60">PIFuHD Motoru çalışıyor, bu işlem ~20 saniye sürer...</p>
                          </div>
                       )}
                     </div>
                   ) : (
-                    <div className="text-center px-8">
+                    <div className="text-center px-8 min-h-[400px] flex flex-col justify-center">
                       {loadingStep === "2d" ? (
-                        <div className="space-y-6"><div className="w-24 h-24 border-4 border-black bg-[#FFF67E] rounded-full shadow-[4px_4px_0px_0_rgba(0,0,0,1)] flex items-center justify-center mx-auto animate-bounce"><Wand2 size={40} className="text-black animate-pulse" /></div><p className="text-xl font-black uppercase animate-pulse">Kıyafet 2D olarak size giydiriliyor...</p></div>
+                        <div className="space-y-6"><div className="w-24 h-24 border-4 border-black bg-[#FFF67E] rounded-full shadow-[4px_4px_0px_0_rgba(0,0,0,1)] flex items-center justify-center mx-auto animate-bounce"><Wand2 size={40} className="text-black animate-pulse" /></div><p className="text-xl font-black uppercase animate-pulse">Kıyafet size giydiriliyor...</p></div>
                       ) : (
-                        <div><div className="w-24 h-24 border-4 border-black bg-gray-50 rounded-2xl shadow-[4px_4px_0px_0_rgba(0,0,0,1)] flex items-center justify-center mx-auto mb-6 transform -rotate-6"><Box size={48} className="text-black/20" /></div><p className="text-xl font-black text-black/40 uppercase">3D Metaverse için hazırsın.</p></div>
+                        <div><div className="w-24 h-24 border-4 border-black bg-gray-50 rounded-2xl shadow-[4px_4px_0px_0_rgba(0,0,0,1)] flex items-center justify-center mx-auto mb-6 transform -rotate-6"><Shirt size={48} className="text-black/20" /></div><p className="text-xl font-black text-black/40 uppercase">Görmek için bir kıyafet yükle.</p></div>
                       )}
                     </div>
                   )}
                 </div>
+
+                {resultImage && !result3DModel && (
+                  <button 
+                    onClick={handleGenerate3D} 
+                    disabled={loadingStep === "3d"}
+                    className="w-full mb-6 py-4 border-4 border-black rounded-2xl shadow-[4px_4px_0px_0_rgba(0,0,0,1)] bg-[#FFF67E] text-black text-xl font-black uppercase hover:-translate-y-1 hover:shadow-[6px_6px_0px_0_rgba(0,0,0,1)] transition-all flex items-center justify-center space-x-3 disabled:opacity-50 disabled:transform-none"
+                  >
+                    <Box size={24} /> <span>{loadingStep === "3d" ? "Anatomi İşleniyor..." : "3D Silüetini Gör (~20sn)"}</span>
+                  </button>
+                )}
+
+                {(isFeedbackLoading || feedback) && (
+                  <div className="border-4 border-black rounded-2xl bg-purple-100 p-6 shadow-[8px_8px_0px_0_rgba(0,0,0,1)] flex-1 shrink-0">
+                    <h3 className="text-xl font-black uppercase flex items-center gap-2 mb-6 text-purple-900 border-b-4 border-purple-900/10 pb-4">
+                      <Sparkles size={24} className="text-purple-600" /> Yapay Zeka Stilisti
+                    </h3>
+                    
+                    {isFeedbackLoading ? (
+                      <div className="animate-pulse space-y-4">
+                        <div className="h-5 bg-purple-900/10 rounded w-3/4"></div>
+                        <div className="h-5 bg-purple-900/10 rounded w-full"></div>
+                        <div className="h-5 bg-purple-900/10 rounded w-5/6"></div>
+                      </div>
+                    ) : feedback ? (
+                      <div className="flex flex-col gap-6">
+                        <div className="flex gap-4 items-center bg-white border-4 border-black p-4 rounded-xl shadow-[4px_4px_0px_0_rgba(0,0,0,1)]">
+                          <div className="text-4xl font-black text-purple-600 flex items-center gap-1">
+                            <UserCheck size={32} /> %{feedback.fit_percentage}
+                          </div>
+                          <div className="font-bold uppercase text-sm leading-tight text-black/60 border-l-4 border-black/10 pl-4">
+                            Genel Vücut <br/> Kalıp Uyumu
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <p className="font-black uppercase text-xs text-black/50 mb-2">Acımasız Analiz</p>
+                            <div className="h-full bg-white border-4 border-black p-4 rounded-xl shadow-[4px_4px_0px_0_rgba(0,0,0,1)] text-sm font-bold leading-relaxed">
+                              {feedback.analysis}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="font-black uppercase text-xs text-black/50 mb-2">Stilist Önerisi</p>
+                            <div className="h-full bg-[#FFF67E] border-4 border-black p-4 rounded-xl shadow-[4px_4px_0px_0_rgba(0,0,0,1)] text-sm font-bold leading-relaxed">
+                              {feedback.recommendation}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+                
               </div>
             </div>
           </div>
@@ -356,7 +557,7 @@ export default function AppShell() {
             <div className="bg-white border-4 border-black rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-[16px_16px_0px_0_rgba(0,0,0,1)] flex flex-col md:flex-row animate-in zoom-in-95 duration-200">
               <div className="w-full md:w-1/2 bg-gray-50 border-b-4 md:border-b-0 md:border-r-4 border-black flex items-center justify-center p-4 relative">
                 <img src={selectedItem.image_url} alt="Seçili Kombin" className="max-h-full object-contain rounded-xl border-4 border-black shadow-[4px_4px_0px_0_rgba(0,0,0,1)]" />
-                <button onClick={() => handleDeleteItem(selectedItem.id, selectedItem.image_url)} className="absolute top-6 left-6 bg-[#FFB4B4] border-4 border-black p-3 rounded-xl hover:bg-red-500 hover:text-white transition-colors shadow-[4px_4px_0px_0_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none"><Trash2 size={24} /></button>
+                <button onClick={() => requestDelete(selectedItem.id, selectedItem.image_url)} className="absolute top-6 left-6 bg-[#FFB4B4] border-4 border-black p-3 rounded-xl hover:bg-red-500 hover:text-white transition-colors shadow-[4px_4px_0px_0_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none"><Trash2 size={24} /></button>
               </div>
               <div className="w-full md:w-1/2 p-8 flex flex-col overflow-y-auto bg-white relative">
                 <button onClick={() => setSelectedItem(null)} className="absolute top-6 right-6 text-black hover:text-red-500 transition-colors"><X size={32} /></button>

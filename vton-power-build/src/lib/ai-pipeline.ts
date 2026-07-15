@@ -1,3 +1,11 @@
+// Eğer Next.js kullanıyorsan ve bu API key'leri barındırıyorsa bu satır güvenlik için önemlidir:
+// "use server"; 
+
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+// ============================================================================
+// 1. VTON (2D SANAL DENEME) SİSTEMİ - [DOKUNULMADI, KUSURSUZ ÇALIŞIYOR]
+// ============================================================================
 export async function generateVTON(
   personImageUrl: string, 
   garmentImageUrl: string, 
@@ -53,29 +61,110 @@ You must treat the facial identity of the subject in the provided reference imag
   }
 }
 
-import { Client } from "@gradio/client";
-
+// ============================================================================
+// 2. PIFUHD (3D ANATOMİ) SİSTEMİ - [YENİ ROTAYA GÖRE SAF OBJ DÖNDÜRÜR]
+// ============================================================================
 export async function generate3DModel(imageUrl: string): Promise<string> {
   try {
-    console.log("[HERMES AI] Modal TripoSR sunucusuna bağlanılıyor...");
+    console.log("[HERMES AI] PIFuHD Motoruna bağlanılıyor...");
 
-    const MODAL_URL = "https://yagizberkonay--hermes-triposr-gradio-gradio-app.modal.run"; 
+    // Yeni PIFuHD Modal linkini buraya eklemelisin (Sonunda /generate_3d olacak)
+    const MODAL_URL = "https://yagizberkonay--hermes-pifuhd-api-pifuhdgenerator-generate-3d.modal.run"; 
 
-    const client = await Client.connect(MODAL_URL);
-
-    console.log("[HERMES AI] Görsel işleniyor, 3D model üretimi başladı...");
-
-    const result: any = await client.predict("/predict", { 		
-        image: imageUrl, 
+    const response = await fetch(MODAL_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image_url: imageUrl }),
     });
 
-    const glbUrl = result.data[0].url; 
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`PIFuHD Sunucu Hatası: ${response.status} - ${errorText}`);
+    }
+
+    console.log("[HERMES AI] 3D Model başarıyla örüldü! Hafızaya alınıyor...");
     
-    console.log("[HERMES AI] 3D Model başarıyla teslim alındı!");
-    return glbUrl;
+    // Gelen ham .obj metnini alıyoruz
+    const objText = await response.text();
     
-  } catch (error) {
-    console.error("TripoSR Modal Hatası:", error);
-    throw new Error("3D üretim sistemi şu anda yanıt vermiyor.");
+    // Tarayıcının hafızasında geçici bir URL oluşturuyoruz (React Three Fiber vs için mükemmeldir)
+    // Eğer bunu bir Node.js backend'inde çalıştırıyorsan blob yerine direkt objText de döndürebilirsin.
+    if (typeof window !== "undefined") {
+      const blob = new Blob([objText], { type: "text/plain" });
+      const blobUrl = URL.createObjectURL(blob);
+      return blobUrl;
+    }
+    
+    return objText; // Backend'de çalışıyorsa direkt metni döndür
+    
+  } catch (error: any) {
+    console.error("PIFuHD Modal Hatası:", error);
+    throw new Error(error.message || "3D üretim sistemi şu anda yanıt vermiyor.");
+  }
+}
+
+// ============================================================================
+// 3. GEMINI STIL DANIŞMANI (YENİ EKLENTİ)
+// ============================================================================
+
+export interface StylistFeedback {
+  fit_percentage: string;
+  analysis: string;
+  recommendation: string;
+}
+
+export async function getStylistFeedback(imageUrl: string): Promise<StylistFeedback> {
+  try {
+    console.log("[GEMINI] Vizyoner stilist fotoğrafı inceliyor...");
+
+    // Gemini API Key'ini .env dosyandan alıyoruz
+    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    if (!apiKey) throw new Error("NEXT_PUBLIC_GEMINI_API_KEY bulunamadı!");
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    
+const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.5-flash", // Benim en güncel ve çalışan versiyonum
+      generationConfig: { responseMimeType: "application/json" } 
+    });
+
+    // İnternetteki VTON sonucunu (URL) indirip Gemini'nin anlayacağı Base64 formatına çeviriyoruz
+    const imageResp = await fetch(imageUrl);
+    const arrayBuffer = await imageResp.arrayBuffer();
+    const base64Data = Buffer.from(arrayBuffer).toString("base64");
+
+    const imagePart = {
+      inlineData: {
+        data: base64Data,
+        mimeType: imageResp.headers.get("content-type") || "image/jpeg",
+      },
+    };
+
+    const systemPrompt = `
+      Sen dünyaca ünlü, vizyoner, acımasız ama son derece dürüst bir kişisel stil danışmanısın. 
+      Kullanıcıya yalan söyleme veya onu sırf mutlu etmek için iyi şeyler söyleme.
+      
+      Görevlerin:
+      1. Görseldeki kişinin ten rengi / saç rengi ile kıyafetin renginin uyumunu analiz et.
+      2. Kıyafetin omuzlara, gövdeye ve genel vücut tipine oturma (fit) durumunu incele.
+      
+      JSON formatında şu anahtarları döndür:
+      - "fit_percentage": Yüzde kaç oranında oturduğu (örneğin "85").
+      - "analysis": Kalıp ve renk uyumu hakkındaki dürüst, agresif ama yapıcı analizin.
+      - "recommendation": Kişiye özel, ten rengini ve vücut tipini öne çıkaracak net bir sonraki kıyafet önerisi.
+    `;
+
+    const result = await model.generateContent([systemPrompt, imagePart]);
+    const responseText = result.response.text();
+    
+    // Gemini'den gelen temiz JSON formatındaki string'i parse ediyoruz
+    const feedback: StylistFeedback = JSON.parse(responseText);
+    
+    console.log("[GEMINI] Stilist raporu hazır!");
+    return feedback;
+
+  } catch (error: any) {
+    console.error("Gemini Stil Danışmanı Hatası:", error);
+    throw new Error("Stil analizi şu anda yapılamıyor.");
   }
 }
