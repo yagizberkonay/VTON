@@ -2,52 +2,30 @@ import { Client } from "@gradio/client";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // ============================================================================
-// 1. HERMES 2D VTON - HUGGING FACE API (Sanal Deneme)
+// 1. HERMES 2D VTON - SUNUCU DESTEKLİ GÜVENLİ MODEL (Sanal Deneme)
 // ============================================================================
 export async function generateVTON(personImageUrl: string, garmentImageUrl: string): Promise<string> {
   try {
-    console.log("🚀 [HERMES VTON] Hugging Face A100 Sunucularına Bağlanılıyor...");
+    console.log("🚀 [HERMES VTON] Güvenli API Route üzerinden istek gönderiliyor...");
 
-    const fetchAsBlob = async (url: string) => {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Görsel yüklenemedi: " + url);
-      return await res.blob();
-    };
+    // Doğrudan kendi yazdığımız Next.js API'sine vuruyoruz
+    const response = await fetch("/api/vton", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ personImageUrl, garmentImageUrl }),
+    });
 
-    const humanBlob = await fetchAsBlob(personImageUrl);
-    const clothBlob = await fetchAsBlob(garmentImageUrl);
-
-    const app = await Client.connect("yisol/IDM-VTON");
-    console.log("🧠 [HERMES VTON] Görseller gönderildi, işleniyor (Ort. 15-20 sn)...");
-
-    const result: any = await app.predict("/tryon", [
-        { "background": humanBlob, "layers": [], "composite": null }, 
-        clothBlob, 
-        "photorealistic fashion garment", 
-        true, false, 30, 42, 
-    ]);
-
-    // 🔥 İŞTE ÇÖZÜM: Gradio'nun sakladığı URL'yi bulmak için Güvenli Tarama (Safe Parsing)
-    let finalImageUrl = "";
-    if (result?.data && Array.isArray(result.data)) {
-        finalImageUrl = result.data[0]?.url || result.data[0];
-    } else if (Array.isArray(result)) {
-        finalImageUrl = result[0]?.url || result[0];
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Sanal deneme sunucu tarafında başarısız oldu.");
     }
 
-    if (!finalImageUrl || finalImageUrl === "undefined") {
-        console.error("Gradio Bozuk Veri Döndürdü:", result);
-        throw new Error("Yapay zeka motoru görselin adresini veremedi!");
-    }
+    const finalImageUrl = data.imageUrl;
+    console.log("🔗 [HERMES VTON] Sunucudan URL Alındı, Base64'e dönüştürülüyor...");
 
-    console.log("🔗 [HERMES VTON] Gerçek Görsel URL'si Yakalandı:", finalImageUrl);
-    
-    // Şimdi GERÇEK görseli indirip Base64'e çeviriyoruz
+    // Görseli tarayıcıya güvenle basmak için Base64 yapıyoruz
     const imageResponse = await fetch(finalImageUrl);
-    if (!imageResponse.ok) {
-        throw new Error(`Görsel indirilemedi! Durum: ${imageResponse.status}`);
-    }
-
+    if (!imageResponse.ok) throw new Error("Üretilen resim indirilemedi.");
     const imageBlob = await imageResponse.blob();
     
     const base64String = await new Promise<string>((resolve, reject) => {
