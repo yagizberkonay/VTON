@@ -17,17 +17,23 @@ export async function generateVTON(personImageUrl: string, garmentImageUrl: stri
     const humanBlob = await fetchAsBlob(personImageUrl);
     const clothBlob = await fetchAsBlob(garmentImageUrl);
 
-    const app = await Client.connect("yisol/IDM-VTON");
+    // 🔥 ÇÖZÜM 1: Yetkilendirme Entegrasyonu (ZeroGPU Kota Hatasını Aşar)
+    // Vercel'deki Environment Variables kısmına HF_TOKEN eklemeyi unutma!
+    const app = await Client.connect("yisol/IDM-VTON", {
+      hf_token: process.env.HF_TOKEN as `hf_${string}`,
+    });
+    
     console.log("🧠 [HERMES VTON] Görseller gönderildi, işleniyor (Ort. 15-20 sn)...");
 
+    // 🔥 ÇÖZÜM 2: Katı Kimlik Koruması (Zero-Morphing & Anti-Beautification Prompt Enjeksiyonu)
     const result: any = await app.predict("/tryon", [
         { "background": humanBlob, "layers": [], "composite": null }, 
         clothBlob, 
-        "photorealistic fashion garment", 
+        "photorealistic fashion garment, exact original facial features, unchanged bone structure, natural skin texture, unedited micro-expressions, zero beautification", 
         true, false, 30, 42, 
     ]);
 
-    // 🔥 İŞTE ÇÖZÜM: Gradio'nun sakladığı URL'yi bulmak için Güvenli Tarama (Safe Parsing)
+    // Gradio'nun sakladığı URL'yi bulmak için Güvenli Tarama (Safe Parsing)
     let finalImageUrl = "";
     if (result?.data && Array.isArray(result.data)) {
         finalImageUrl = result.data[0]?.url || result.data[0];
