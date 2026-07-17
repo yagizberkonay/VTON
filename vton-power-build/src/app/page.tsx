@@ -1,11 +1,44 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Sparkles, ShieldCheck, Zap, Shirt } from "lucide-react";
+import { ArrowRight, Sparkles, ShieldCheck, Zap, Shirt, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase"; // Supabase bağlantını ekledik
 
 export default function LandingPage() {
+  const router = useRouter();
+  const [isChecking, setIsChecking] = useState(true);
+
+  // 🔥 YENİ: Sayfa açılır açılmaz oturum kontrolü yapan mekanizma
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        // Kullanıcının oturumu varsa anında stüdyoya fırlat
+        router.push("/studio");
+      } else {
+        // Oturumu yoksa landing page'i göstermeye izin ver
+        setIsChecking(false);
+      }
+    };
+
+    checkSession();
+  }, [router]);
+
+  // 🔥 YENİ: Kontrol sırasındaki saliselik yükleme ekranı (Flash engelleme)
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-[#FDFDFD] flex items-center justify-center selection:bg-[#FFF67E]">
+         <Loader2 size={64} className="animate-spin text-black" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#FDFDFD] text-black font-sans overflow-x-hidden selection:bg-[#FFF67E]">
       
-
       <header className="h-24 border-b-4 border-black px-6 md:px-12 flex items-center justify-between bg-white sticky top-0 z-50">
         <div className="flex items-center space-x-2">
           <h1 className="text-4xl font-black tracking-tighter uppercase">Hermes.</h1>
