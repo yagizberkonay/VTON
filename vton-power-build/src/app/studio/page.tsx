@@ -175,18 +175,21 @@ export default function AppShell() {
         currentScrapedInfo = info;
       }
 
-      // NÜKLEER ÇÖZÜM: VTON'dan dönen %100 GERÇEK Base64 şifresini alıyoruz.
-      const base64Result = await generateVTON(userProfile.avatar_url, finalGarmentImage!);
+      // 1. API'den doğrudan URL geliyor
+      const finalGeneratedUrl = await generateVTON(userProfile.avatar_url, finalGarmentImage!);
       
-      // Ekrana anında bu Base64'ü basıyoruz (Çökmelere Karşı Kusursuz Çalışır)
-      setResultImage(base64Result);
+      // Ekranda saniyesinde görünmesi için URL'yi state'e veriyoruz
+      setResultImage(finalGeneratedUrl);
 
-      // Base64'ü Blob'a çevirip Supabase'e yüklüyoruz ki 404 hatası olmasın
-      const blobRes = await fetch(base64Result);
-      const blob = await blobRes.blob();
+      // 2. Supabase'e Yükleme (Format Uyuşmazlığını Çözen Kısım)
+      const response = await fetch(finalGeneratedUrl);
+      const blob = await response.blob();
       
-      const extension = blob.type.split('/')[1] || 'png';
-      const file = new File([blob], `vton-${Date.now()}.${extension}`, { type: blob.type });
+      // Gelen dosya PNG mi, WEBP mi, JPEG mi onu okuyoruz
+      const actualMimeType = blob.type || 'image/jpeg';
+      const extension = actualMimeType.split('/')[1] || 'jpg';
+      
+      const file = new File([blob], `vton-${Date.now()}.${extension}`, { type: actualMimeType });
       const fileName = `${userProfile.id}-${Date.now()}.${extension}`;
       
       await supabase.storage.from('wardrobe').upload(fileName, file);
@@ -202,10 +205,10 @@ export default function AppShell() {
 
       if (activeTab === "wardrobe") fetchWardrobe();
 
-      // Gemini'a linki değil, elimizdeki KESİN DOĞRU Base64 verisini gönderiyoruz!
+      // 3. Gemini Stilistine Supabase Linkini Gönderiyoruz
       setIsFeedbackLoading(true);
       try {
-        const stylistData = await getStylistFeedback(base64Result);
+        const stylistData = await getStylistFeedback(publicUrlData.publicUrl);
         const feedbackObject = typeof stylistData === 'string' ? JSON.parse(stylistData) : stylistData;
         setFeedback(feedbackObject);
       } catch (geminiError) {
