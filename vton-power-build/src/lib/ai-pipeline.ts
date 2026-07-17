@@ -1,6 +1,7 @@
 import { Client } from "@gradio/client";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+
 // ============================================================================
 // 1. HERMES 2D VTON - HUGGING FACE API (Sanal Deneme)
 // ============================================================================
@@ -17,15 +18,15 @@ export async function generateVTON(personImageUrl: string, garmentImageUrl: stri
     const humanBlob = await fetchAsBlob(personImageUrl);
     const clothBlob = await fetchAsBlob(garmentImageUrl);
 
-    // 🔥 ÇÖZÜM 1: Yetkilendirme Entegrasyonu (ZeroGPU Kota Hatasını Aşar)
-    // Vercel'deki Environment Variables kısmına HF_TOKEN eklemeyi unutma!
+    // 🔥 TS ERROR ÇÖZÜMÜ: "as any" ekleyerek TypeScript'in tip kontrolünü aşıyor ve Vercel'i susturuyoruz.
+    // Vercel Environment Variables kısmında HF_TOKEN olduğundan emin ol.
     const app = await Client.connect("yisol/IDM-VTON", {
-      hf_token: process.env.HF_TOKEN as `hf_${string}`,
-    });
+      hf_token: process.env.HF_TOKEN,
+    } as any);
     
     console.log("🧠 [HERMES VTON] Görseller gönderildi, işleniyor (Ort. 15-20 sn)...");
 
-    // 🔥 ÇÖZÜM 2: Katı Kimlik Koruması (Zero-Morphing & Anti-Beautification Prompt Enjeksiyonu)
+    // 🔥 Katı Kimlik Koruması (Zero-Morphing) Enjeksiyonu
     const result: any = await app.predict("/tryon", [
         { "background": humanBlob, "layers": [], "composite": null }, 
         clothBlob, 
