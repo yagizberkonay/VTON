@@ -11,17 +11,27 @@ export async function POST(request: Request) {
 
     console.log("🖥️ [SERVER VTON] Hugging Face ile güvenli sunucu bağlantısı kuruluyor...");
 
-    // Token artık SUNUCUDA çalışıyor, NEXT_PUBLIC_ olmasına gerek yok!
-    // Vercel panelinde HF_TOKEN olarak kalabilir, garanti olsun diye ikisine de bakarız.
+    // 🔥 ÇÖZÜM: Sunucuda da tıpkı tarayıcıdaki gibi görselleri "Dosya (Blob)" formatına çevirmeliyiz!
+    const fetchAsBlob = async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Görsel sunucuya çekilemedi: " + url);
+      return await res.blob();
+    };
+
+    // Görselleri Gradio'nun anlayacağı formata paketliyoruz
+    const humanBlob = await fetchAsBlob(personImageUrl);
+    const clothBlob = await fetchAsBlob(garmentImageUrl);
+
     const token = process.env.HF_TOKEN || process.env.NEXT_PUBLIC_HF_TOKEN;
 
     const app = await Client.connect("yisol/IDM-VTON", {
       hf_token: token,
     } as any);
 
+    // 🔥 Katı Kimlik Koruması: Anti-Beautification ve yapısal bozulmaları engelleyen kesin prompt
     const result: any = await app.predict("/tryon", [
-      { "background": personImageUrl, "layers": [], "composite": null },
-      garmentImageUrl,
+      { "background": humanBlob, "layers": [], "composite": null },
+      clothBlob,
       "photorealistic fashion garment, exact original facial features, unchanged bone structure, natural skin texture, unedited micro-expressions, zero beautification",
       true, false, 30, 42,
     ]);
