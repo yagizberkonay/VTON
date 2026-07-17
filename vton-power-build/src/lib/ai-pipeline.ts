@@ -84,10 +84,15 @@ export async function getStylistFeedback(imageInput: string): Promise<string> {
         generationConfig: { responseMimeType: "application/json" }
     });
 
-    // Kendi mevcut vizyoner JSON prompt'unu buraya ekleyebilirsin. 
-    // UI çökmesini engellemek için JSON şemasına sadık kalmasını istiyoruz.
-    const prompt = `Act as an objective, visionary fashion stylist. Analyze this outfit. You must respond ONLY with a valid JSON format.`;
-
+    // UI çökmesini engellemek için JSON şemasını KESİN ve KATI olarak belirliyoruz.
+    const prompt = `Act as an objective, visionary fashion stylist. Analyze this outfit. 
+    You MUST respond ONLY with a valid JSON format using exactly this structure:
+    {
+      "fit_percentage": "A number between 1-100 indicating the overall fit",
+      "analysis": "A single, clear paragraph of brutal and objective text analyzing the style, colors, and body fit.",
+      "recommendation": "A single paragraph of visionary recommendations to improve the outfit."
+    }
+    Do NOT create any nested objects or additional keys. Only return strings for analysis and recommendation. Responses must be in Turkish.`;
     const result = await model.generateContent([
         prompt,
         {
