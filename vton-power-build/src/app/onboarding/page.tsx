@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Mail, Lock, AlertCircle, Loader2, Sparkles, UploadCloud, Info, CheckCircle2, User, Ruler } from "lucide-react";
@@ -12,6 +12,9 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function OnboardingPage() {
   const router = useRouter();
+  
+  // 🔥 YENİ: Oturum kontrol state'i
+  const [isChecking, setIsChecking] = useState(true);
   
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
@@ -26,6 +29,23 @@ export default function OnboardingPage() {
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 🔥 YENİ: Sayfa yüklendiğinde aktif oturum var mı diye kontrol eden kısım
+  useEffect(() => {
+    const checkActiveSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        // Kullanıcı giriş yapmışsa doğrudan stüdyoya atla
+        router.push("/studio"); 
+      } else {
+        // Kullanıcı giriş yapmamışsa formu göster
+        setIsChecking(false);
+      }
+    };
+
+    checkActiveSession();
+  }, [router]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,6 +118,18 @@ export default function OnboardingPage() {
       setLoading(false);
     }
   };
+
+  // 🔥 YENİ: Kontrol aşamasında gösterilecek Hermes tarzı yükleme ekranı
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-[#FFB4B4] flex items-center justify-center p-6 selection:bg-[#FFF67E]">
+        <div className="bg-white border-4 border-black rounded-3xl p-10 shadow-[12px_12px_0px_0_rgba(0,0,0,1)] flex flex-col items-center gap-6 animate-pulse">
+          <Loader2 size={64} className="animate-spin text-black" />
+          <h1 className="text-3xl font-black uppercase tracking-tighter">Hermes'e Geçiliyor...</h1>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FFB4B4] flex items-center justify-center p-6 selection:bg-[#FFF67E]">
