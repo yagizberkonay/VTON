@@ -92,7 +92,7 @@ export async function getStylistFeedback(imageInput: string): Promise<string> {
       "analysis": "A single, clear paragraph of brutal and objective text analyzing the style, colors, and body fit.",
       "recommendation": "A single paragraph of visionary recommendations to improve the outfit."
     }
-    Do NOT create any nested objects or additional keys. Only return strings for analysis and recommendation. Responses must be in Turkish.`;
+    Do NOT create any nested objects or additional keys. Only return strigitngs for analysis and recommendation. Responses must be in Turkish.`;
     const result = await model.generateContent([
         prompt,
         {
