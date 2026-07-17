@@ -11,14 +11,12 @@ export async function POST(request: Request) {
 
     console.log("🖥️ [SERVER VTON] Hugging Face ile güvenli sunucu bağlantısı kuruluyor...");
 
-    // 🔥 ÇÖZÜM: Sunucuda da tıpkı tarayıcıdaki gibi görselleri "Dosya (Blob)" formatına çevirmeliyiz!
     const fetchAsBlob = async (url: string) => {
       const res = await fetch(url);
       if (!res.ok) throw new Error("Görsel sunucuya çekilemedi: " + url);
       return await res.blob();
     };
 
-    // Görselleri Gradio'nun anlayacağı formata paketliyoruz
     const humanBlob = await fetchAsBlob(personImageUrl);
     const clothBlob = await fetchAsBlob(garmentImageUrl);
 
@@ -28,7 +26,7 @@ export async function POST(request: Request) {
       hf_token: token,
     } as any);
 
-    // 🔥 Katı Kimlik Koruması: Anti-Beautification ve yapısal bozulmaları engelleyen kesin prompt
+    // 🔥 Katı Kimlik Koruması ve Anti-Beautification
     const result: any = await app.predict("/tryon", [
       { "background": humanBlob, "layers": [], "composite": null },
       clothBlob,
@@ -47,8 +45,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Yayındaki AI motoru görsel üretemedi." }, { status: 500 });
     }
 
-    console.log("🖥️ [SERVER VTON] Görsel başarıyla üretildi:", finalImageUrl);
-    return NextResponse.json({ imageUrl: finalImageUrl });
+    console.log("🖥️ [SERVER VTON] Görsel üretildi, sunucuya indiriliyor: ", finalImageUrl);
+
+    // 🔥 CORS ÇÖZÜMÜ: Görseli sunucuda indirip Base64'e çeviriyoruz
+    const imageResponse = await fetch(finalImageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Hugging Face'ten görsel indirilemedi! Durum: ${imageResponse.status}`);
+    }
+
+    const arrayBuffer = await imageResponse.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+    const base64String = `data:${mimeType};base64,${buffer.toString('base64')}`;
+
+    console.log("🖥️ [SERVER VTON] Görsel başarıyla Base64 yapıldı ve tarayıcıya yollanıyor!");
+    
+    // Tarayıcıya URL değil, doğrudan Base64 metnini veriyoruz
+    return NextResponse.json({ resultImageBase64: base64String });
 
   } catch (error: any) {
     console.error("💥 [SERVER VTON HATA]:", error);

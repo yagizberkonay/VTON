@@ -8,7 +8,6 @@ export async function generateVTON(personImageUrl: string, garmentImageUrl: stri
   try {
     console.log("🚀 [HERMES VTON] Güvenli API Route üzerinden istek gönderiliyor...");
 
-    // Doğrudan kendi yazdığımız Next.js API'sine vuruyoruz
     const response = await fetch("/api/vton", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -16,27 +15,15 @@ export async function generateVTON(personImageUrl: string, garmentImageUrl: stri
     });
 
     const data = await response.json();
+    
     if (!response.ok) {
       throw new Error(data.error || "Sanal deneme sunucu tarafında başarısız oldu.");
     }
 
-    const finalImageUrl = data.imageUrl;
-    console.log("🔗 [HERMES VTON] Sunucudan URL Alındı, Base64'e dönüştürülüyor...");
-
-    // Görseli tarayıcıya güvenle basmak için Base64 yapıyoruz
-    const imageResponse = await fetch(finalImageUrl);
-    if (!imageResponse.ok) throw new Error("Üretilen resim indirilemedi.");
-    const imageBlob = await imageResponse.blob();
+    console.log("✅ [HERMES VTON] Sunucudan doğrudan hazır Base64 görsel alındı!");
     
-    const base64String = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(imageBlob);
-    });
-
-    console.log("✅ [HERMES VTON] Görsel Şifrelendi (Base64)!");
-    return base64String;
+    // Sunucu zaten Base64 çevirisini yaptı, doğrudan UI'a (Arayüze) yansıtıyoruz
+    return data.resultImageBase64;
 
   } catch (err: any) {
     console.error("💥 [HERMES VTON HATA]:", err);
