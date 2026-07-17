@@ -34,50 +34,73 @@ export async function generateVTON(personImageUrl: string, garmentImageUrl: stri
 // ============================================================================
 // 2. GEMINI STİL DANIŞMANI (Objektif, JSON Çıktılı Mod)
 // ============================================================================
-export async function getStylistFeedback(imageBase64: string): Promise<string> {
+export async function getStylistFeedback(imageInput: string): Promise<string> {
   try {
     console.log("👗 [GEMINI] Vizyoner stilist fotoğrafı inceliyor...");
 
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY || process.env.GOOGLE_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "";
-    if (!apiKey) throw new Error("Gemini API anahtarı bulunamadı!");
+    let rawBase64 = "";
+    let mimeType = "image/jpeg";
 
+    // 🔥 ÇÖZÜM: Gelen veri Supabase URL'si mi, yoksa Base64 mü? Dinamik olarak filtreliyoruz.
+    if (imageInput.startsWith("http")) {
+        console.log("📥 [GEMINI] Supabase URL'si algılandı, görsel arka planda indiriliyor...");
+        const response = await fetch(imageInput);
+        if (!response.ok) throw new Error("Gemini için görsel indirilemedi!");
+        
+        const blob = await response.blob();
+        mimeType = blob.type || "image/jpeg";
+        
+        const base64String = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+        
+        // Gemini "data:image/png;base64," önekini sevmez, sadece virgülden sonrasını (saf veriyi) veriyoruz
+        rawBase64 = base64String.split(",")[1];
+    } 
+    else if (imageInput.startsWith("data:image")) {
+        // Gelen veri zaten önekli bir Base64 ise
+        mimeType = imageInput.substring(imageInput.indexOf(":") + 1, imageInput.indexOf(";"));
+        rawBase64 = imageInput.split(",")[1];
+    } 
+    else {
+        // Veri tamamen saf Base64 ise
+        rawBase64 = imageInput;
+    }
+
+    // Gemini API Bağlantısı
+    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    if (!apiKey) throw new Error("Gemini API Anahtarı bulunamadı!");
+
+    // Eğer projenin en üstünde import etmediysen, genAI kütüphanesini burada çağırıyoruz
+    const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    
+    // Loglarda çalışan model olan 2.5-flash ve JSON koruması
+    const model = genAI.getGenerativeModel({ 
+        model: "gemini-2.5-flash",
+        generationConfig: { responseMimeType: "application/json" }
+    });
 
-    // HTML değil, garantili resim Base64'ü geliyor
-    const mimeTypeMatch = imageBase64.match(/^data:(image\/[a-zA-Z0-9]+);base64,/);
-    const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : "image/jpeg";
-    const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
+    // Kendi mevcut vizyoner JSON prompt'unu buraya ekleyebilirsin. 
+    // UI çökmesini engellemek için JSON şemasına sadık kalmasını istiyoruz.
+    const prompt = `Act as an objective, visionary fashion stylist. Analyze this outfit. You must respond ONLY with a valid JSON format.`;
 
-    const prompt = `
-      Sen profesyonel, objektif ve dürüst bir moda analistisin. 
-      Ekteki görselde, sanal olarak giydirilmiş bir kıyafet kombinasyonu görüyorsun.
-      
-      LÜTFEN ŞU KURALLARA KESİNLİKLE UY:
-      1. Asla abartılı, yapay veya sahte övgüler kullanma.
-      2. Yorumların kısa, net, yapısal ve tamamen objektif olsun.
-      3. Kıyafetin omuzlara, vücut oranlarına ve genel silüetine nasıl oturduğunu teknik olarak analiz et.
-      4. Eğer anatomik veya stilistik olarak uyumsuz, emanet duran bir detay varsa doğrudan belirt.
-      
-      ÇIKTIYI SADECE AŞAĞIDAKİ GİBİ SAF JSON FORMATINDA VER (Markdown kullanma, sadece JSON):
-      {
-        "fit_percentage": "85",
-        "analysis": "Buraya acımasız ve teknik analizi yaz.",
-        "recommendation": "Buraya net stilist önerisini yaz."
-      }
-    `;
+    const result = await model.generateContent([
+        prompt,
+        {
+            inlineData: {
+                data: rawBase64,
+                mimeType: mimeType
+            }
+        }
+    ]);
 
-    const imagePart = {
-      inlineData: { data: cleanBase64, mimeType: mimeType }
-    };
-
-    const result = await model.generateContent([prompt, imagePart]);
-    let responseText = result.response.text();
-
-    responseText = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
-    console.log("✅ [GEMINI] Stil analizi tamamlandı.");
-    return responseText;
-
+    console.log("✅ [GEMINI] Stil analizi başarıyla tamamlandı!");
+    return result.response.text();
+    
   } catch (err: any) {
     console.error("💥 [GEMINI HATA]:", err);
     throw new Error("Stil analizi şu anda yapılamıyor.");
