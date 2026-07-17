@@ -15,9 +15,39 @@ export async function generateVTON(personImageUrl: string, garmentImageUrl: stri
       body: JSON.stringify({ personImageUrl, garmentImageUrl }),
     });
 
+<<<<<<< HEAD
     const data = await response.json();
     if (!response.ok) {
       throw new Error(data.error || "Sanal deneme sunucu tarafında başarısız oldu.");
+=======
+    const humanBlob = await fetchAsBlob(personImageUrl);
+    const clothBlob = await fetchAsBlob(garmentImageUrl);
+
+    // 🔥 ÇÖZÜM: Artık token'ın başında NEXT_PUBLIC_ var, tarayıcı bu şifreyi görebilecek!
+    const token = process.env.NEXT_PUBLIC_HF_TOKEN;
+    if (!token) console.warn("⚠️ [Uyarı] NEXT_PUBLIC_HF_TOKEN bulunamadı, anonim olarak deneniyor.");
+
+    const app = await Client.connect("yisol/IDM-VTON", {
+      hf_token: token,
+    } as any);
+    
+    console.log("🧠 [HERMES VTON] Görseller gönderildi, işleniyor (Ort. 15-20 sn)...");
+
+    // 🔥 Katı Kimlik Koruması (Zero-Morphing & Anti-Beautification)
+    const result: any = await app.predict("/tryon", [
+        { "background": humanBlob, "layers": [], "composite": null }, 
+        clothBlob, 
+        "photorealistic fashion garment, exact original facial features, unchanged bone structure, natural skin texture, unedited micro-expressions, zero beautification", 
+        true, false, 30, 42, 
+    ]);
+
+    // Gradio'nun sakladığı URL'yi bulmak için Güvenli Tarama (Safe Parsing)
+    let finalImageUrl = "";
+    if (result?.data && Array.isArray(result.data)) {
+        finalImageUrl = result.data[0]?.url || result.data[0];
+    } else if (Array.isArray(result)) {
+        finalImageUrl = result[0]?.url || result[0];
+>>>>>>> 9af1acc19cb7be8605094692d81854bc9a1358f1
     }
 
     const finalImageUrl = data.imageUrl;
