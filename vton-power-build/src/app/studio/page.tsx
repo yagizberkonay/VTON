@@ -76,9 +76,6 @@ export default function AppShell() {
   const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
   const [avatarLoading, setAvatarLoading] = useState(false);
 
-  // =====================================================================
-  // BRUTALIST POPUP (DIALOG) STATE'İ
-  // =====================================================================
   const [dialogConfig, setDialogConfig] = useState<DialogConfig>({
     isOpen: false,
     type: "alert",
@@ -114,8 +111,6 @@ export default function AppShell() {
     });
   };
 
-  // =====================================================================
-  
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -180,13 +175,19 @@ export default function AppShell() {
         currentScrapedInfo = info;
       }
 
-      const generatedB64Url = await generateVTON(userProfile.avatar_url, finalGarmentImage!, extraDetails);
-      setResultImage(generatedB64Url);
+      // NÜKLEER ÇÖZÜM: VTON'dan dönen %100 GERÇEK Base64 şifresini alıyoruz.
+      const base64Result = await generateVTON(userProfile.avatar_url, finalGarmentImage!);
+      
+      // Ekrana anında bu Base64'ü basıyoruz (Çökmelere Karşı Kusursuz Çalışır)
+      setResultImage(base64Result);
 
-      const response = await fetch(generatedB64Url);
-      const blob = await response.blob();
-      const file = new File([blob], `vton-${Date.now()}.png`, { type: 'image/png' });
-      const fileName = `${userProfile.id}-${Date.now()}.png`;
+      // Base64'ü Blob'a çevirip Supabase'e yüklüyoruz ki 404 hatası olmasın
+      const blobRes = await fetch(base64Result);
+      const blob = await blobRes.blob();
+      
+      const extension = blob.type.split('/')[1] || 'png';
+      const file = new File([blob], `vton-${Date.now()}.${extension}`, { type: blob.type });
+      const fileName = `${userProfile.id}-${Date.now()}.${extension}`;
       
       await supabase.storage.from('wardrobe').upload(fileName, file);
       const { data: publicUrlData } = supabase.storage.from('wardrobe').getPublicUrl(fileName);
@@ -201,10 +202,12 @@ export default function AppShell() {
 
       if (activeTab === "wardrobe") fetchWardrobe();
 
+      // Gemini'a linki değil, elimizdeki KESİN DOĞRU Base64 verisini gönderiyoruz!
       setIsFeedbackLoading(true);
       try {
-        const stylistData = await getStylistFeedback(publicUrlData.publicUrl);
-        setFeedback(stylistData);
+        const stylistData = await getStylistFeedback(base64Result);
+        const feedbackObject = typeof stylistData === 'string' ? JSON.parse(stylistData) : stylistData;
+        setFeedback(feedbackObject);
       } catch (geminiError) {
         console.warn("Gemini Stilist Hatası:", geminiError);
       } finally {
@@ -317,7 +320,6 @@ export default function AppShell() {
   return (
     <div className="min-h-screen bg-[#FDFDFD] text-black font-sans flex overflow-hidden selection:bg-[#FFF67E] relative">
       
-      {/* BRUTALIST DIALOG / POPUP MİMARİSİ */}
       {dialogConfig.isOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
           <div className="bg-white border-[6px] border-black rounded-3xl w-full max-w-md overflow-hidden shadow-[16px_16px_0px_0_rgba(0,0,0,1)] animate-in zoom-in-95 duration-200 flex flex-col">
@@ -456,6 +458,7 @@ export default function AppShell() {
                     </div>
                   ) : resultImage ? (
                     <div className="w-full h-full relative group min-h-[400px]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={resultImage} alt="2D Sonuç" className="w-full h-full object-contain bg-gray-50 p-2 absolute inset-0" />
                       {loadingStep === "3d" && (
                          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center border-4 border-indigo-600 m-4 rounded-xl animate-pulse">

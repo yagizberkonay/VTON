@@ -1,7 +1,15 @@
 "use client"; // Eğer Next.js App Router kullanıyorsan bu satır zorunludur
 
 import React, { useState } from "react";
-import { generateVTON, generate3DModel, getStylistFeedback, StylistFeedback } from "@/lib/ai-pipeline";
+import { generateVTON, generate3DModel, getStylistFeedback } from "@/lib/ai-pipeline";
+
+// If the ai-pipeline module doesn't export StylistFeedback, define a local interface
+// with the expected fields used in this component.
+interface StylistFeedback {
+  fit_percentage: number;
+  analysis: string;
+  recommendation: string;
+}
 
 export default function VtonInterface() {
   // Sistem Durumları (States)
@@ -36,7 +44,10 @@ export default function VtonInterface() {
 
       // 2D biter bitmez kullanıcıyı bekletmeden arka planda Gemini Stilistini çağırırız
       setIsFeedbackLoading(true);
-      const stylistData = await getStylistFeedback(vtonResult);
+      const stylistResponse = await getStylistFeedback(vtonResult);
+      const stylistData: StylistFeedback = typeof stylistResponse === "string"
+        ? JSON.parse(stylistResponse)
+        : stylistResponse;
       setFeedback(stylistData);
     } catch (error: any) {
       alert("Hata oluştu: " + error.message);

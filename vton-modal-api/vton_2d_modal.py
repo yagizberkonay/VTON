@@ -11,7 +11,11 @@ vton_image = (
         extra_options="--index-url https://download.pytorch.org/whl/cu121"
     )
     .pip_install(
-        # IDM-VTON'un kalbini oluşturan paketler ve çökmeyi önleyen tam sürüm numaraları
+        # İSYANKAR KÜTÜPHANELERİ SABİTLEDİK (NumPy ve HuggingFace Hub)
+        "numpy==1.26.4",             
+        "huggingface-hub==0.20.3",   
+        
+        # IDM-VTON Core
         "diffusers==0.25.1", 
         "transformers==4.38.2", 
         "accelerate==0.27.2", 
@@ -21,10 +25,8 @@ vton_image = (
         "fastapi",
         "einops",
         "omegaconf",
-        "scipy",
-        "huggingface-hub"
+        "scipy"
     )
-    # requirements.txt komutunu sildik, sadece depoyu klonluyoruz
     .run_commands(
         "rm -rf /root/idm-vton",
         "git clone https://github.com/yisol/IDM-VTON.git /root/idm-vton"
